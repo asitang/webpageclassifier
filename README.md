@@ -6,7 +6,7 @@ Even if there is a definition the structure of the webpage can be anything asd s
 BLOGS: these mostly have a bolg provider: And in most cases the name gets appended in the blog url itself.
 FORUMS: Although they come in different structure and flavors, One of the most common and exact way of recognizing them is thru their	
 			1. url: It cmay ontain the word forum (not always true)
-			2. html tags: the <table>, <tr>, <td> tags contains the "class" attribute that has some of the commonly repeting names like: views, posts, thread etc.
+			2. html tags: the \<table\>, \<tr\>, \<td\> tags contains the "class" attribute that has some of the commonly repeting names like: views, posts, thread etc.
 			The code not only looks for these exact words but also looks if these words are a part of the name of any class in these tags.
  CLASSIFIEDS and SHOPS: Here I used a two stage approch to first classify the page into one of these using a list of words for each.
 						 The main difference I assumed was that a 'classified' page had many "touting" words, because it's people selling stuff,
@@ -19,4 +19,4 @@ FORUMS: Although they come in different structure and flavors, One of the most c
 		Checking the url, header and 
 		footer is also a very good	idea, but it may lead you astray if used even before using the above mentioned accurate techniques. Especially the 
 		words in the header and footer may lead you astray (say a footer may contain both 'blog' and 'forum')	
-		If indecisive this code will call the hyperian grey team categorizer (That code is commented -- please also import their code first)
+		If indecisive this code will call the hyperian grey team categorizer (That code is commented - please also import their code first)
