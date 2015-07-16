@@ -116,7 +116,7 @@ def cosinesimilaritymeasure(words,goldwords):
 	for word in commonwords:
 		sumwords+=wordfreq[word]*wordfreq[word]
 	
-	print(commonwords)
+	#print(commonwords)
 
 	sumwords=math.sqrt(sumwords)
 	sumgoldwords=math.sqrt(sumgoldwords)
@@ -221,7 +221,7 @@ def categorizeurl(url):
 	classlist=[j for i in classlist for j in forumclassnamelist if j in i]	
 
 	forumscore=cosinesimilaritymeasure(classlist,forumclassnamelist)
-	print('forum score::'+ str(forumscore))
+	#print('forum score::'+ str(forumscore))
 	if forumscore>=0.4:
 		return 'forum'
 
@@ -234,7 +234,7 @@ def categorizeurl(url):
 	contentlist=re.sub('[^A-Za-z0-9]+',' ', contentlist)
 	contentlist=contentlist.split(' ')
 	newsscore=cosinesimilaritymeasure(contentlist,newslist)
-	print('news score::'+ str(newsscore))
+	#print('news score::'+ str(newsscore))
 	if newsscore>0.4:
 		return 'news'
 		
@@ -250,8 +250,8 @@ def categorizeurl(url):
 
 	classifiedscore=cosinesimilaritymeasure(html_content,classifiedlist)
 	shoppingscore=cosinesimilaritymeasure(html_content,shoppinglist)
-	print('classified score::'+ str(classifiedscore))
-	print('shopping score::'+ str(shoppingscore))
+	#print('classified score::'+ str(classifiedscore))
+	#print('shopping score::'+ str(shoppingscore))
 	if classifiedscore>shoppingscore:
 		if classifiedscore>0.4:
 			return 'classified'
