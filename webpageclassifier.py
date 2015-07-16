@@ -15,7 +15,7 @@ limitations under the License.
 
 """
 
-__author__ = 'Asitang jpl memex'
+__author__ = 'Asitang Mishra jpl memex'
 
 
 from bs4 import BeautifulSoup
@@ -31,7 +31,7 @@ def ngrams(input, n):
     output.append(input[i:i+n])
   return output
 
-#checks for the existence of a word in the url
+#checks for the existence of a set of words (provided as a list) in the url
 def checkforwordinurl(url,wordlist):
 	for word in wordlist:
 		if word in url:
@@ -47,6 +47,15 @@ def extractallclassnames(taglist,attrib,html_doc):
 		for classtags in soup.find_all(tag):
 			classlist.append(classtags.get(attrib))
 	return classlist		
+
+def extractallfromtag(taglist,html_doc):
+	soup = BeautifulSoup(html_doc, 'html.parser')
+	contentlist=[]
+	for tag in taglist:
+		for content in soup.find_all(tag):
+			classlist.append(content)
+	return contentlist		
+
 
 """def numberoftags(taglist,html_doc):
 	soup = BeautifulSoup(html_doc, 'html.parser')
@@ -104,9 +113,9 @@ def cosinesimilaritymeasure(words,goldwords):
 # categorize a url using this: The flow is very important for the categorization:
 # THE BIG IDEA: It is inherently confusing to classify pages as clasifieds, blogs, forums because of no single or clear definition.
 # Even if there is a definition the structure of the webpage can be anything asd still comply with that definition.
-# BLOGS: these mostly have a bolg provider: And in most cases the name gets appended in the blog url itself.
+# BLOGS: these mostly have a blog provider: And in most cases the name gets appended in the blog url itself.
 # FORUMS: Although they come in different structure and flavors, One of the most common and exact way of recognizing them is thru their	
-#			1. url: It cmay ontain the word forum (not always true)
+#			1. url: It may contain the word forum (not always true)
 #			2. html tags: the <table>, <tr>, <td> tags contains the "class" attribute that has some of the commonly repeting names like: views, posts, thread etc.
 #			The code not only looks for these exact words but also looks if these words are a part of the name of any class in these tags.
 # CLASSIFIEDS and SHOPS: Here I used a two stage approch to first classify the page into one of these using a list of words for each.
@@ -137,19 +146,40 @@ def categorizeurl(url):
 		blogproviderslist.append(line)
 		
 	if checkforwordinurl(url,blogproviderslist):
-			url_type='blog'
-			return url_type
+			return 'blog'
 		
 
-	#check for the word 'forum' in the url
+	#check for 'wiki' word in the url: high precedence
+
+	if 'wiki' in url:
+		return 'wiki'
+
+	#check for 'forum', 'news' or 'blog' in the url: equal precedence
+	forum=False
+	blog=False
+	news=False
+	ct=0
 
 	if 'forum' in url:
+		forum=True
 		url_type='forum'
-		return url_type
+		ct+=1
 
 	if 'blog' in url:
+		blog=True
 		url_type='blog'
-		return url_type		
+		ct+=1
+
+	if 'news' in url:
+		news=True
+		url_type='news'
+		ct+=1
+
+	if ct>1:
+		url_type='undecided'
+	elif ct==1:
+		return url_type	
+			
 
 	#check if it's a forum: by cosine similarity on the 'class' attribute of <tr>, <td> and <table> tags
 
@@ -164,6 +194,9 @@ def categorizeurl(url):
 
 	tags=['tr','td','table']	
 	classlist=extractallclassnames(tags,'class',html_content)
+	tags=['nav','header','footer']
+	contentlist=extractallfromtag(tags,html_content)
+
 	#remove the NoneType
 	classlist = [i for i in classlist if i is not None]
 	#flatten a list of list
@@ -173,8 +206,27 @@ def categorizeurl(url):
 
 	score=cosinesimilaritymeasure(classlist,forumclassnamelist)
 	if score>=0.5:
-		url_type='forum'
-		return url_type
+		return 'forum'
+
+
+	#check if a news website: check the nav, header and footer data (all content, class and tags within), use similarity
+
+	newslist=[]
+	news=open("forum.txt",'r',encoding='cp1252', errors='ignore')
+
+	for line in news:
+		line=line.rstrip('\n')
+		newslist.append(line)
+
+
+	contentlist=' '.join(str(contentlist))
+	re.sub('[^A-Za-z0-9]+',' ', str(contentlist))
+	contentlist=contentlist.split(' ')
+	newsscore=cosinesimilaritymeasure(contentlist,newslist)
+
+	if newsscore>0.5:
+		return 'news'
+		
 
 	#check if a classified or shopping website
 
@@ -200,13 +252,14 @@ def categorizeurl(url):
 
 	if classifiedscore>shoppingscore:
 		if classifiedscore>0.5:
-			url_type='classified'
-			return url_type
+			return 'classified'
 	if shoppingscore>classifiedscore:
 		if shoppingscore>0.5:
-			url_type='shopping'
-			return url_type
-					
+			return 'shopping'
+	
+	
+
+
 
 	#call hyperian grey classifier if indecisive
 	

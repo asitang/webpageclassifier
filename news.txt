@@ -1,0 +1,14 @@
+politics
+art
+religion
+life
+music
+weather
+shop
+travel
+science
+world
+video
+sport
+local
+news
