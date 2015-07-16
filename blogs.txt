@@ -1,8 +1,0 @@
-.blogspot.com
-.wordpress.com
-.livejournal.com
-.tumblr.com
-.xanga.com
-.typepad.com
-/medium.com/
-.blog.com

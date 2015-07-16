@@ -23,6 +23,20 @@ import re
 import math
 import urllib.request
 
+
+#reads the golden files and adds different versions of the same word and returns a list: like NEWS, news, News
+
+def readgolden(filepath):
+	inputfile=open(filepath,'r',encoding='cp1252', errors='ignore')
+	goldenlist=[]
+	for line in inputfile:
+		line=line.rstrip('\n')
+		goldenlist.append(line.lower())
+		goldenlist.append(line.upper())
+		goldenlist.append(line.title())
+	return goldenlist	
+
+
 #creates n grams for a string and outputs it as a list
 def ngrams(input, n):
   input = input.split(' ')
@@ -53,7 +67,7 @@ def extractallfromtag(taglist,html_doc):
 	contentlist=[]
 	for tag in taglist:
 		for content in soup.find_all(tag):
-			classlist.append(content)
+			contentlist.append(str(content))
 	return contentlist		
 
 
@@ -102,6 +116,8 @@ def cosinesimilaritymeasure(words,goldwords):
 	for word in commonwords:
 		sumwords+=wordfreq[word]*wordfreq[word]
 	
+	print(commonwords)
+
 	sumwords=math.sqrt(sumwords)
 	sumgoldwords=math.sqrt(sumgoldwords)
 	if sumgoldwords!=0 and sumwords!=0:
@@ -110,26 +126,41 @@ def cosinesimilaritymeasure(words,goldwords):
 				
 
 
-# categorize a url using this: The flow is very important for the categorization:
+# This function categorizes and returns the urls as one of the following: 'blog', 'wiki', 'news', 'forum', 'classified', 'shopping' and 'undecided'
+#
 # THE BIG IDEA: It is inherently confusing to classify pages as clasifieds, blogs, forums because of no single or clear definition.
-# Even if there is a definition the structure of the webpage can be anything asd still comply with that definition.
-# BLOGS: these mostly have a blog provider: And in most cases the name gets appended in the blog url itself.
-# FORUMS: Although they come in different structure and flavors, One of the most common and exact way of recognizing them is thru their	
+# Even if there is a definition the structure of the webpage can be anything and still comply with that definition.
+# The flow is very important for the categorization.
+#
+# URL CHECK: The code checks the urls for WIKI, BLOGS, FORUMS and NEWS before anythin else. In case we have multiple clues in a single url
+# such as www.**newsforum**.com, it gives utmost precedence to the wiki. Then treats the others as equal and keeps the result undecided hoping it will be 
+# decided by one of the successive processes. 
+# 
+# WIKI: The easiest and most certain way of identifying a wiki is looking into its url.
+#
+# BLOG: these mostly have a blog provider: And in most cases the name gets appended in the blog url itself.
+#
+# FORUM: Although they come in different structure and flavors, One of the most common and exact way of recognizing them is thru their	
 #			1. url: It may contain the word forum (not always true)
 #			2. html tags: the <table>, <tr>, <td> tags contains the "class" attribute that has some of the commonly repeting names like: views, posts, thread etc.
 #			The code not only looks for these exact words but also looks if these words are a part of the name of any class in these tags.
-# CLASSIFIEDS and SHOPS: Here I used a two stage approch to first classify the page into one of these using a list of words for each.
-#						 The main difference I assumed was that a 'classified' page had many "touting" words, because it's people selling stuff,
+#
+# NEWS: Checking the <nav>, <header> and <footer> tags' data (attributes, text, sub tags etc.) for common words we find in a news
+#		website like 'world', 'political', 'arts' etc ... 'news' as well and calculates the similary and uses it with a threshhold.
+#
+# CLASSIFIED and SHOPPING: Here the code uses a two stage approch to first classify the page into one of these using a list of words for each.
+#						 The main difference assumed was that a 'classified' page had many "touting" words, because it's people selling stuff,
 #						 whereas a 'shopping' page had different kinds of selling words (ofcourse there is some overlap, the the code takes care of that)
-#						 Then I see if the predicted type is independently relevent as a classified of shopping web page (using a threshhold).				
-#		the flow of how the sites are checked here is very important because of the heirarchy on the internet (say a forum can be a shopping forum - 
-#		the code will correctly classify it as a forum)		
+#						 Then it checks see if the predicted type is independently relevent as a classified of shopping web page (using a threshhold).				
+#						 The flow of how the sites are checked here is very important because of the heirarchy on the 
+#						 internet (say a forum can be a shopping forum - 
+#						 the code will correctly classify it as a forum)		
 #	 
-#		The code uses some necessary conditions (if you may say) to find the accurate classification.
-#		Checking the url, header and 
-#		footer is also a very good	idea, but it may lead you astray if used even before using the above mentioned accurate techniques. Especially the 
-#		words in the header and footer may lead you astray (say a footer may contain both 'blog' and 'forum')	
-#		If indecisive this code will call the hyperian grey team categorizer (That code is commented -- please also import their code first)
+# The code uses some necessary conditions (if you may say) to find the accurate classification.
+# Checking the url, header and 
+# footer is also a very good	idea, but it may lead you astray if used even before using the above mentioned accurate techniques. Especially the 
+# words in the header and footer may lead you astray (say a footer may contain both 'blog' and 'forum')	
+# If indecisive this code will call the Hyperian Grey team categorizer (That code is commented -- please also import their code first)
 
 def categorizeurl(url):
 	url_type='undecided'
@@ -138,13 +169,9 @@ def categorizeurl(url):
 		html_content = response.read()
 
 	#check for blog providers name in the url
-	blogproviderslist=[]
-	blogproviders=open("blogs.txt",'r',encoding='cp1252', errors='ignore')
-
-	for line in blogproviders:
-		line=line.rstrip('\n')
-		blogproviderslist.append(line)
-		
+	
+	blogproviderslist=readgolden('blog.txt')
+	
 	if checkforwordinurl(url,blogproviderslist):
 			return 'blog'
 		
@@ -183,12 +210,7 @@ def categorizeurl(url):
 
 	#check if it's a forum: by cosine similarity on the 'class' attribute of <tr>, <td> and <table> tags
 
-	forumclassnamelist=[]
-	forumclassnames=open("forum.txt",'r',encoding='cp1252', errors='ignore')
-
-	for line in forumclassnames:
-		line=line.rstrip('\n')
-		forumclassnamelist.append(line)
+	forumclassnamelist=readgolden('forum.txt')
 
 	
 
@@ -204,57 +226,43 @@ def categorizeurl(url):
 	#check if the classnames contain any of the words from the 'forum' list
 	classlist=[j for i in classlist for j in forumclassnamelist if j in i]	
 
-	score=cosinesimilaritymeasure(classlist,forumclassnamelist)
-	if score>=0.5:
+	forumscore=cosinesimilaritymeasure(classlist,forumclassnamelist)
+	print('forum score::'+ str(forumscore))
+	if forumscore>=0.4:
 		return 'forum'
 
 
 	#check if a news website: check the nav, header and footer data (all content, class and tags within), use similarity
 
-	newslist=[]
-	news=open("forum.txt",'r',encoding='cp1252', errors='ignore')
+	newslist=readgolden('news.txt')
 
-	for line in news:
-		line=line.rstrip('\n')
-		newslist.append(line)
-
-
-	contentlist=' '.join(str(contentlist))
-	re.sub('[^A-Za-z0-9]+',' ', str(contentlist))
+	contentlist=' '.join(contentlist)
+	contentlist=re.sub('[^A-Za-z0-9]+',' ', contentlist)
 	contentlist=contentlist.split(' ')
 	newsscore=cosinesimilaritymeasure(contentlist,newslist)
-
-	if newsscore>0.5:
+	print('news score::'+ str(newsscore))
+	if newsscore>0.4:
 		return 'news'
 		
 
 	#check if a classified or shopping website
 
-	shoppinglist=[]
-	shopping=open("shopping.txt",'r',encoding='cp1252', errors='ignore')
-	classifiedlist=[]
-	classified=open("classified.txt",'r',encoding='cp1252', errors='ignore')
+	shoppinglist=readgolden('shopping.txt')
+	classifiedlist=readgolden('classified.txt')
 
-	for line in shopping:
-		line=line.rstrip('\n')
-		shoppinglist.append(line)
-
-	for line in classified:
-		line=line.rstrip('\n')
-		classifiedlist.append(line)	
-
-	re.sub('[^A-Za-z0-9]+',' ', str(html_content))	
+	html_content=re.sub('[^A-Za-z0-9]+',' ', str(html_content))
 	html_content=str(html_content).split(' ')+[' '.join(x) for x in ngrams(str(html_content), 2)]
 	
 
 	classifiedscore=cosinesimilaritymeasure(html_content,classifiedlist)
 	shoppingscore=cosinesimilaritymeasure(html_content,shoppinglist)
-
+	print('classified score::'+ str(classifiedscore))
+	print('shopping score::'+ str(shoppingscore))
 	if classifiedscore>shoppingscore:
-		if classifiedscore>0.5:
+		if classifiedscore>0.4:
 			return 'classified'
 	if shoppingscore>classifiedscore:
-		if shoppingscore>0.5:
+		if shoppingscore>0.4:
 			return 'shopping'
 	
 	
@@ -274,7 +282,7 @@ def categorizeurl(url):
 
 if __name__ == "__main__":
    
-	url="https://forums.gentoo.org/"
+	url="http://www.npr.org/sections/health-shots/2015/07/16/423261565/webcast-sports-and-health-in-america"
 	print(categorizeurl(url))
 
 
