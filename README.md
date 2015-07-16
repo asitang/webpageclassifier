@@ -1,4 +1,4 @@
-This function categorizes and returns the urls as one of the following: 'blog', 'wiki', 'news', 'forum', 'classified', 'shopping' and 'undecided'
+Categorizes a website (have to provide the url) and returns as one of the following: 'blog', 'wiki', 'news', 'forum', 'classified', 'shopping' and 'undecided'
 THE BIG IDEA: It is inherently confusing to classify pages as clasifieds, blogs, forums because of no single or clear definition.
 Even if there is a definition the structure of the webpage can be anything and still comply with that definition.
 The flow is very important for the categorization.
