@@ -13,10 +13,10 @@ BLOG: these mostly have a blog provider: And in most cases the name gets appende
 
 FORUM: Although they come in different structure and flavors, One of the most common and exact way of recognizing them is thru their	
 			1. url: It may contain the word forum (not always true)
-			2. html tags: the <table>, <tr>, <td> tags contains the "class" attribute that has some of the commonly repeting names like: views, posts, thread etc.
+			2. html tags: the 'table', 'tr', 'td' tags contains the 'class' attribute that has some of the commonly repeting names like: views, posts, thread etc.
 			The code not only looks for these exact words but also looks if these words are a part of the name of any class in these tags.
 
-NEWS: Checking the <nav>, <header> and <footer> tags' data (attributes, text, sub tags etc.) for common words we find in a news
+NEWS: Checking the 'nav', 'header' and 'footer' tags' data (attributes, text, sub tags etc.) for common words we find in a news
 		website like 'world', 'political', 'arts' etc ... 'news' as well and calculates the similary and uses it with a threshhold.
 
  CLASSIFIED and SHOPPING: Here the code uses a two stage approch to first classify the page into one of these using a list of words for each.
