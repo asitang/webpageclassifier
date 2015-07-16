@@ -182,23 +182,17 @@ def categorizeurl(url):
 		return 'wiki'
 
 	#check for 'forum', 'news' or 'blog' in the url: equal precedence
-	forum=False
-	blog=False
-	news=False
 	ct=0
 
 	if 'forum' in url:
-		forum=True
 		url_type='forum'
 		ct+=1
 
 	if 'blog' in url:
-		blog=True
 		url_type='blog'
 		ct+=1
 
 	if 'news' in url:
-		news=True
 		url_type='news'
 		ct+=1
 
