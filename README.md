@@ -4,7 +4,7 @@ Even if there is a definition the structure of the webpage can be anything and s
 The flow is very important for the categorization.
 
 URL CHECK: The code checks the urls for WIKI, BLOGS, FORUMS and NEWS before anythin else. In case we have multiple clues in a single url
-such as www.**newsforum**.com, it gives utmost precedence to the wiki. Then treats the others as equal and keeps the result undecided hoping it will be 
+such as wwwDOT**newsforum**DOTcom, it gives utmost precedence to the wiki. Then treats the others as equal and keeps the result undecided hoping it will be 
 decided by one of the successive processes. 
  
 WIKI: The easiest and most certain way of identifying a wiki is looking into its url.
