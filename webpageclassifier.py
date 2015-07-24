@@ -50,8 +50,7 @@ def checkforwordinurl(url,wordlist):
 	for word in wordlist:
 		if word in url:
 			return True
-		else:
-			return False	
+	return False	
 
 # extracts all the values of a specific attribute of some specific tags (a list of tags) from an html page
 def extractallclassnames(taglist,attrib,html_doc):
