@@ -5,6 +5,7 @@ news, cnn.com
 news, news.google.com
 news, npr.org/sections/health-shots/2015/07/16/423261565/webcast-sports-and-health-in-america
 news, news.google.com/news/story?cf=all&hl=en&ned=us&ncl=dC5Sb8DGE3ud_hMhO5i85Y-3Hms2M&topic=snc
+news, https://www.nytimes.com/2017/01/31/us/politics/sally-yates-trump-immigration-ban.html
 forum, ubuntuforums.org
 forum, arstechnica.com
 forum, reddit.com
@@ -21,6 +22,7 @@ blog, erratasec.com
 blog, krebsonsecurity.com
 blog, joelonsoftware.com
 blog, schneier.com
+blog, troyhunt.com
 classified, craigslist.com
 classified, geebo.com
 classified, backpage.com
@@ -50,5 +52,3 @@ undecided, memex.jpl.nasa.gov
 undecided, soteradefense.com
 undecided, google.com
 
-# news, https://www.nytimes.com/2017/01/31/us/politics/sally-yates-trump-immigration-ban.html
-# blog, troyhunt.com

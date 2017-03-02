@@ -2,7 +2,8 @@
 
 import math
 import re
-import urllib.request
+#import urllib.request
+import requests
 
 from bs4 import BeautifulSoup
 
@@ -127,7 +128,7 @@ def cosine_sim(words, goldwords):
 
 def name_in_url(url):
     """Check for 'wiki', 'forum', 'news' or 'blog' in the url.
-    'wiki' trumps, the rest must be unaccompanied by others.
+    'wiki' trumps; the rest must have no competitors to count.
     """
     count = 0
     if 'wiki' in url:
@@ -142,6 +143,9 @@ def name_in_url(url):
     return url_type
 
 
+def printlist(name, mylist, N=10, prefix='\t'):
+    print('{}{}: {}...'.format(prefix, name, mylist[:N]))
+
 def forum_score(html, forum_classname_list):
     """Return cosine similarity between the forum_classname_list and
     the 'class' attribute of <tr>, <td> and <table> tags.
@@ -153,10 +157,10 @@ def forum_score(html, forum_classname_list):
     classlist = [i for i in classlist if i is not None]
     # flatten a list of list
     classlist = [item for sublist in classlist for item in sublist]
-    print('\tforum classlist1:', classlist)
+    printlist('forum classlist1:', classlist)
     # check if the classnames contain any of the words from the 'forum' list
     classlist = [j for i in classlist for j in forum_classname_list if j in i]
-    print('\tforum classlist2:', classlist)
+    printlist('forum classlist2:', classlist)
 
     score = cosine_sim(classlist, forum_classname_list)
     print('\tforum score: %4.2fs\n' % score)
@@ -170,8 +174,8 @@ def news_score(html, news_list):
     contentlist = extract_all_fromtag(tags, html)
     contentlist = ' '.join(contentlist)
     contentlist = re.sub('[^A-Za-z0-9]+', ' ', contentlist)
-    print('\tnews contentlist:', contentlist)
     contentlist = contentlist.split(' ')
+    printlist('news contentlist:', contentlist)
     score = cosine_sim(contentlist, news_list)
     print('\tnews score: %4.2f' % score)
     return score
@@ -228,14 +232,8 @@ def categorize_url(url, goldwords):
     (That code is commented -- please also import their code first)
 
     """
-    hdr = {'User-Agent': 'MEMEX Page Classifier'}
-    req = urllib.request.Request(url, headers=hdr)
-    # TODO: fails on sites requiring cookies
-    # Either add HTTPCookieProcessor, or use requests (for humans)
-    with urllib.request.urlopen(req) as response:
-        html = response.read().decode('utf-8', 'backslashreplace').lower()
 
-    # 1. Check for blog goldwords
+    # 1. Check for blog goldwords in URL
     if word_in_url(url, goldwords['blog']):
         return 'blog'
 
@@ -243,6 +241,11 @@ def categorize_url(url, goldwords):
     name_type = name_in_url(url)
     if name_type != 'undecided':
         return name_type
+
+    # OK, we actually have to look at the page. :-)
+    hdr = {'User-Agent': 'MEMEX Page Classifier'}
+    r = requests.get(url, params=hdr)
+    html = r.text.lower()
 
     # 3. Check if cosine similarity suggest a forum
     if forum_score(html, goldwords['forum']) >= 0.4:
@@ -253,7 +256,6 @@ def categorize_url(url, goldwords):
         return 'news'
 
     # 5. Check if cosine similarity suggests shopping or classified.
-    # TODO: Should we be using Sets?
     text = re.sub(u'[^A-Za-z0-9]+', ' ', html)
     print('\t#5 text:', text)
     text_list = text.split(' ') + [' '.join(x) for x in ngrams(text, 2)]
@@ -294,6 +296,11 @@ if __name__ == "__main__":
     gold_words = get_goldwords()
     with open('urls.csv') as f:
         df = pd.read_csv(f, header=0, skipinitialspace=True)
+    # Short way, if all works
+    # df['Test'] = [categorize_url(expand_url(url)) for url in df['URL']]
+
+    # Verbose way
+    answers= []
     for url in df['URL']:
         print()
         print(url)
@@ -301,6 +308,6 @@ if __name__ == "__main__":
         print(eu)
         ans = categorize_url(eu, gold_words)
         print('\t---> %s <---' % ans)
-
-    #df['Test'] = [categorize_url(expand_url(url)) for url in df['URL']]
+        answers.append(ans)
+    df['Test'] = answers
     print(df)
