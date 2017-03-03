@@ -1,4 +1,12 @@
 Category, URL
+forum, ubuntuforums.org
+forum, arstechnica.com
+forum, reddit.com
+forum, ubuntuforums.org/showthread.php?t=937963
+forum, stackexchange.com
+forum, stackoverflow.com
+forum, http://stackoverflow.com/questions/42564043/android-studio-populating-listview-from-innerclass
+forum, http://cogsci.stackexchange.com
 news, nytimes.com
 news, foxnews.com
 news, cnn.com
@@ -6,10 +14,6 @@ news, news.google.com
 news, npr.org/sections/health-shots/2015/07/16/423261565/webcast-sports-and-health-in-america
 news, news.google.com/news/story?cf=all&hl=en&ned=us&ncl=dC5Sb8DGE3ud_hMhO5i85Y-3Hms2M&topic=snc
 news, https://www.nytimes.com/2017/01/31/us/politics/sally-yates-trump-immigration-ban.html
-forum, ubuntuforums.org
-forum, arstechnica.com
-forum, reddit.com
-forum, ubuntuforums.org/showthread.php?t=937963
 wiki, wiki.ubuntu.com/ForumCouncilAgenda
 wiki, en.wikipedia.org
 wiki, fr.wikipedia.org
@@ -23,7 +27,8 @@ blog, krebsonsecurity.com
 blog, joelonsoftware.com
 blog, schneier.com
 blog, troyhunt.com
-classified, craigslist.com
+classified, craigslist.org
+classified, washingtondc.craigslist.org
 classified, geebo.com
 classified, backpage.com
 classified, oodle.com

@@ -2,12 +2,64 @@
 
 import math
 import re
-#import urllib.request
 import requests
+import collections
+import itertools
 
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, SoupStrainer
+from time import sleep
+
+"""Categorizes urls as blog|wiki|news|forum|classified|shopping|undecided.
+
+THE BIG IDEA: It is inherently confusing to classify pages as clasifieds, blogs,
+forums because of no single or clear definition. Even if there is a definition
+the structure of the webpage can be anything and still comply with that definition.
+The flow is very important for the categorization.
+
+URL CHECK: The code checks the urls for WIKI, BLOGS, FORUMS and NEWS before anything
+else. In case we have multiple clues in a single url such as www.**newsforum**.com,
+it gives utmost precedence to the wiki. Then treats the others as equal and keeps
+the result undecided hoping it will be decided by one of the successive processes.
+
+WIKI: The easiest and most certain way of identifying a wiki is looking into its url.
+
+BLOG: these mostly have a blog provider: And in most cases the name gets appended in the blog url itself.
+
+FORUM: Although they come in different structure and flavors, one of the most
+common and exact way of recognizing them is thru their:
+    1. url: It may contain the word forum (not always true)
+    2. html tags: the <table>, <tr>, <td> tags contains the "class" attribute that
+       has some of the commonly repeting names like: views, posts, thread etc.
+       The code not only looks for these exact words but also looks if these words
+       are a part of the name of any class in these tags.
+
+NEWS: Checking the <nav>, <header> and <footer> tags' data (attributes, text, sub tags
+etc.) for common words we find in a news website like 'world', 'political', 'arts' etc
+... 'news' as well and calculates the similary and uses it with a threshhold.
+
+CLASSIFIED and SHOPPING: Here the code uses a two stage approch to first classify the
+page into one of these using a list of words for each. The main difference assumed was
+that a 'classified' page had many "touting" words, because it's people selling stuff,
+whereas a 'shopping' page had different kinds of selling words (of course there is some
+overlap, the the code takes care of that). Then it checks see if the predicted type is
+independently relevent as a classified of shopping web page (using a threshhold).
+
+The flow of how the sites are checked here is very important because of the heirarchy
+on the internet (say a forum can be a shopping forum - the code will correctly classify
+it as a forum)
+
+The code uses some necessary conditions (if you may say) to find the accurate classification.
+Checking the url, header and footer is also a very good	idea, but it may lead you astray
+if used even before using the above mentioned accurate techniques. Especially the
+words in the header and footer may lead you astray (say a footer may contain both 'blog'
+and 'forum')
+
+If indecisive this code will call the Hyperion Gray team categorizer
+(That code is commented -- please also import their code first)
 
 """
+
+LICENSE = """
 Copyright [2015] [jpl]
 
 Licensed under the Apache License, Version 2.0 (the "License");
@@ -35,7 +87,6 @@ def read_golden(filepath):
     goldenlist = []
     with open(filepath, 'r', encoding='cp1252', errors='ignore') as f:
         goldenlist = [x.lower().strip() for x in f.readlines()]
-    print('Golden(%s):' % filepath, goldenlist)
     return goldenlist
 
 # creates n grams for a string and outputs it as a list
@@ -54,28 +105,37 @@ def word_in_url(url, wordlist):
             return True
     return False
 
+def flatten(l):
+    """From Christian @ http://stackoverflow.com/questions/2158395/flatten-an-irregular-list-of-lists-in-python"""
+    for el in l:
+        if isinstance(el, collections.Iterable) and not isinstance(el, (str, bytes)):
+            yield from flatten(el)
+        else:
+            yield el
 
-# extracts all the values of a specific attribute of some specific tags (a list of tags) from an html page
-def extract_all_classnames(taglist, attrib, html_doc):
-    soup = BeautifulSoup(html_doc, 'html.parser')
-    classlist = []
-    for tag in taglist:
-        for classtags in soup.find_all(tag):
-            classlist.append(classtags.get(attrib))
-    return classlist
+def extract_all_classnames(taglist, html_doc):
+    """Extracts all `class` values `html_doc`, but only for tags in `taglist`.
+    Ignores tags w/o class attribute - they don't affect cosine_sim anyway.
+    Returns: flattened generator of class names appearing in tags.
+    Note: returned generator may have "" entries, e.g. for <a class="" href=...>
+    """
+    # Note '_' in next line - soup trick to avoid the Python 'class' keyword.
+    strainer = SoupStrainer(taglist, class_=True)
+    soup = BeautifulSoup(html_doc, 'lxml', parse_only=strainer)
+    return flatten((tag.attrs['class'] for tag in soup.find_all() if 'class' in tag.attrs))
 
 
 def extract_all_fromtag(taglist, html_doc):
-    soup = BeautifulSoup(html_doc, 'html.parser')
-    contentlist = []
-    for tag in taglist:
-        for content in soup.find_all(tag):
-            contentlist.append(str(content))
-    return contentlist
+    """Extract all tags in taglist from html_doc. Return as list of Tag.
+    Note some items will be long portions of the document!!
+    """
+    strainer = SoupStrainer(taglist)
+    soup = BeautifulSoup(html_doc, 'lxml', parse_only=strainer)
+    return soup.find_all()
 
 
 # def numberoftags(taglist,html_doc):
-# 	soup = BeautifulSoup(html_doc, 'html.parser')
+# 	soup = BeautifulSoup(html_doc, 'lxml')
 # 	count=0
 # 	for tag in taglist:
 # 		for classtags in soup.findall(tag):
@@ -144,139 +204,120 @@ def name_in_url(url):
 
 
 def printlist(name, mylist, N=10, prefix='\t'):
-    print('{}{}: {}...'.format(prefix, name, mylist[:N]))
+    """Print first N items of list or generator, prefix & name"""
+    try:
+        print('{}{}: {}...'.format(prefix, name, mylist[:N]))
+    except TypeError:
+        ans = itertools.islice(mylist, N)
+        print('{}{}: {}...'.format(prefix, name, ans))
 
-def forum_score(html, forum_classname_list):
-    """Return cosine similarity between the forum_classname_list and
-    the 'class' attribute of <tr>, <td> and <table> tags.
+
+def forum_score(html, forum_classnames):
+    """Return cosine similarity between the forum_classnames and
+    the 'class' attribute of certain tags.
     """
-    tags = ['tr', 'td', 'table']
-    classlist = extract_all_classnames(tags, 'class', html)
+    tags = ['tr', 'td', 'table', 'div', 'p', 'article']
+    classlist = extract_all_classnames(tags, html)
+    #printlist('forum classlist:', classlist)
+    # Keep only matches, and only in canonical form. So 'forum' not 'forums'.
+    # TODO: doesn't this artificially inflate cosine_sim? By dropping non-matches?
+    classlist = [j for i in classlist for j in forum_classnames if j in i]
+    #printlist('canonical form :', classlist)
 
-    # Flatten and remove the NoneType
-    classlist = [i for i in classlist if i is not None]
-    # flatten a list of list
-    classlist = [item for sublist in classlist for item in sublist]
-    printlist('forum classlist1:', classlist)
-    # check if the classnames contain any of the words from the 'forum' list
-    classlist = [j for i in classlist for j in forum_classname_list if j in i]
-    printlist('forum classlist2:', classlist)
-
-    score = cosine_sim(classlist, forum_classname_list)
-    print('\tforum score: %4.2fs\n' % score)
-    return score
+    return cosine_sim(classlist, forum_classnames)
 
 def news_score(html, news_list):
     """Check if a news website: check the nav, header and footer data
     (all content, class and tags within), use similarity
     """
     tags = ['nav', 'header', 'footer']
-    contentlist = extract_all_fromtag(tags, html)
-    contentlist = ' '.join(contentlist)
-    contentlist = re.sub('[^A-Za-z0-9]+', ' ', contentlist)
-    contentlist = contentlist.split(' ')
-    printlist('news contentlist:', contentlist)
-    score = cosine_sim(contentlist, news_list)
-    print('\tnews score: %4.2f' % score)
-    return score
+    contents = extract_all_fromtag(tags, html)
+    contents = (re.sub('[^A-Za-z0-9]+', ' ', x.text).strip() for x in contents)
+    contents = ' '.join(contents).split(' ')
+    #printlist('news contents:', contents)
+    return cosine_sim(contents, news_list)
 
+def get_html(url):
+    """Fetch HTML and convert to lowercase. If error, prepend with '_HTTP_ERROR_'."""
+    # Some pages dislike custom agents. Define alternatives.
+    alt_agents = [
+        'MEMEX_PageClass_bot/0.5',
+        'Mozilla/5.0',
+        'Gecko/1.0',
+        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_10; rv:33.0) Gecko/20100101 Firefox/33.0',
+        'Mozilla/5.0 (compatible, MSIE 11, Windows NT 6.3; Trident/7.0; rv:11.0) like Gecko'
+        'Mozilla/5.0 (Windows NT 6.1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/41.0.2228.0 Safari/537.36',
+        ]
 
+    for agent in alt_agents:
+        r = requests.get(url, params={'User-Agent': agent})
+        if r.status_code == requests.codes['ok']:
+            return r.text.lower()
+        wait = 1
+        if r.status_code == requests.codes['too_many']:
+            wait = int(r.headers['Retry-After'])
+        print('*** Agent "%s" failed. Retrying...' % agent)
+        sleep(wait) # Reduce chance of 429 error (Too many requests)
+    print("\tERROR  :", r.status_code)
+    print("\tCOOKIES:", [x for x in r.cookies])
+    print("\tHISTORY:", r.history)
+    print("\tHEADERS:", r.headers)
+    print("\tRESPONSE:", r.text[:100], '...')
+    return "_HTTP_ERROR_" + r.text.lower()
 
 def categorize_url(url, goldwords):
-    """Categorizes urls as blog|wiki|news|forum|classified|shopping|undecided.
-
-    THE BIG IDEA: It is inherently confusing to classify pages as clasifieds, blogs,
-    forums because of no single or clear definition. Even if there is a definition
-    the structure of the webpage can be anything and still comply with that definition.
-    The flow is very important for the categorization.
-
-    URL CHECK: The code checks the urls for WIKI, BLOGS, FORUMS and NEWS before anything
-    else. In case we have multiple clues in a single url such as www.**newsforum**.com,
-    it gives utmost precedence to the wiki. Then treats the others as equal and keeps
-    the result undecided hoping it will be decided by one of the successive processes.
-
-    WIKI: The easiest and most certain way of identifying a wiki is looking into its url.
-
-    BLOG: these mostly have a blog provider: And in most cases the name gets appended in the blog url itself.
-
-    FORUM: Although they come in different structure and flavors, one of the most
-    common and exact way of recognizing them is thru their:
-        1. url: It may contain the word forum (not always true)
-        2. html tags: the <table>, <tr>, <td> tags contains the "class" attribute that
-           has some of the commonly repeting names like: views, posts, thread etc.
-           The code not only looks for these exact words but also looks if these words
-           are a part of the name of any class in these tags.
-
-    NEWS: Checking the <nav>, <header> and <footer> tags' data (attributes, text, sub tags
-    etc.) for common words we find in a news website like 'world', 'political', 'arts' etc
-    ... 'news' as well and calculates the similary and uses it with a threshhold.
-
-    CLASSIFIED and SHOPPING: Here the code uses a two stage approch to first classify the
-    page into one of these using a list of words for each. The main difference assumed was
-    that a 'classified' page had many "touting" words, because it's people selling stuff,
-    whereas a 'shopping' page had different kinds of selling words (of course there is some
-    overlap, the the code takes care of that). Then it checks see if the predicted type is
-    independently relevent as a classified of shopping web page (using a threshhold).
-
-    The flow of how the sites are checked here is very important because of the heirarchy
-    on the internet (say a forum can be a shopping forum - the code will correctly classify
-    it as a forum)
-
-    The code uses some necessary conditions (if you may say) to find the accurate classification.
-    Checking the url, header and footer is also a very good	idea, but it may lead you astray
-    if used even before using the above mentioned accurate techniques. Especially the
-    words in the header and footer may lead you astray (say a footer may contain both 'blog'
-    and 'forum')
-
-    If indecisive this code will call the Hyperion Gray team categorizer
-    (That code is commented -- please also import their code first)
-
+    """Categorizes urls as blog | wiki | news | forum | classified | shopping | undecided.
+    Returns best guess and a dictionary of scores, which may be empty.
     """
+    scores = {}
 
     # 1. Check for blog goldwords in URL
     if word_in_url(url, goldwords['blog']):
-        return 'blog'
+        return 'blog', scores
 
     # 2. Check for category name in URL
     name_type = name_in_url(url)
     if name_type != 'undecided':
-        return name_type
+        return name_type, scores
 
-    # OK, we actually have to look at the page. :-)
-    hdr = {'User-Agent': 'MEMEX Page Classifier'}
-    r = requests.get(url, params=hdr)
-    html = r.text.lower()
+    # OK, we actually have to look at the page.
+    html = get_html(url)
+    if html.startswith('_HTTP_ERROR_'):
+        return 'ERROR', scores
 
-    # 3. Check if cosine similarity suggest a forum
-    if forum_score(html, goldwords['forum']) >= 0.4:
-        return 'forum'
-
-    # 4. Check if cosine similarity suggests news
-    if news_score(html, goldwords['news']) >= 0.4:
-        return 'news'
-
-    # 5. Check if cosine similarity suggests shopping or classified.
+    # Calculate all cosine similarity scores
+    # It used to stop at the first acceptable, but I want to compare.
+    fs = forum_score(html, goldwords['forum'])
+    ns = news_score(html, goldwords['news'])
     text = re.sub(u'[^A-Za-z0-9]+', ' ', html)
-    print('\t#5 text:', text)
     text_list = text.split(' ') + [' '.join(x) for x in ngrams(text, 2)]
-    classified_score = cosine_sim(html, goldwords['classified'])
-    shopping_score = cosine_sim(html, goldwords['shopping'])
-    print('\tclassified score:: %4.2f' % classified_score)
-    print('\tshopping score:: %4.2f' % shopping_score)
-    if 0.4 < classified_score > shopping_score:
-        return 'classified'
-    if 0.4 < shopping_score > classifiedscore:
-        return 'shopping'
+    cs = cosine_sim(text_list, goldwords['classified'])
+    ss = cosine_sim(text_list, goldwords['shopping'])
 
+    scores = {'forum': fs,
+              'news': ns,
+              'classified': cs,
+              'shopping': ss}
+    THRESH = 0.4
 
-        # call hyperian grey classifier if indecisive
+    # 3. Forum
+    if fs >= THRESH:
+        return 'forum', scores
+    if ns >= THRESH:
+        return 'news', scores
+    if THRESH < cs > ss:
+        return 'classified', scores
+    if THRESH < ss > cs:
+        return 'shopping', scores
 
-        # if url_type=='undecided':
-        # fs = DumbCategorize(url)
-        # category=fs.categorize()
-        # url_type=category
-        # return url_type
-    return 'undecided'
+    # 6. If still undecided, call hyperion grey classifier
+    # if url_type=='undecided':
+    #     fs = DumbCategorize(url)
+    #     category=fs.categorize()
+    #     url_type=category
+    #     return url_type
+
+    return 'undecided', scores
 
 def expand_url(url):
     if url.startswith('http'):
@@ -291,23 +332,43 @@ def get_goldwords():
         gold_words[name] = read_golden(name + '.txt')
     return gold_words
 
+def print_weights(weights, prefix='\t[', suffix=']'):
+    ans = []
+    for key in ['forum', 'news', 'classified', 'shopping']:
+        ans.append('%s: %4.2f' % (key[:2], weights[key]))
+    print('{}{}{}'.format(prefix, ', '.join(ans), suffix))
+
 if __name__ == "__main__":
     import pandas as pd
     gold_words = get_goldwords()
+    for key, val in gold_words.items():
+        printlist(key, val)
     with open('urls.csv') as f:
         df = pd.read_csv(f, header=0, skipinitialspace=True)
-    # Short way, if all works
-    # df['Test'] = [categorize_url(expand_url(url)) for url in df['URL']]
+    #df = df.iloc[:5]   # Subset for testing
 
-    # Verbose way
-    answers= []
+    answers, scores = [], []
     for url in df['URL']:
-        print()
-        print(url)
         eu = expand_url(url)
-        print(eu)
-        ans = categorize_url(eu, gold_words)
-        print('\t---> %s <---' % ans)
-        answers.append(ans)
+        print('\n' + eu)
+        cat, weights = categorize_url(eu, gold_words)
+        try:
+            print_weights(weights)
+        except KeyError:
+            pass
+        print('\t---> %s <--- ' % cat)
+        answers.append(cat)
+        scores.append(weights)
+
     df['Test'] = answers
+    df['Correct?'] = df['Test'] == df['Category']
+    df = pd.concat([df, pd.DataFrame(scores)], axis=1)
+
+    print()
     print(df)
+    df.describe()
+
+    n_right = df['Correct?'].sum()
+    score = n_right / len(df)
+    print()
+    print('*ACCURACY*: {}/{} = {:4.2f}'.format(n_right, len(df), score))
